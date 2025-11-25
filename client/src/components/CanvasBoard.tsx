@@ -135,8 +135,8 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   return (
     <div className="flex flex-col items-center space-y-2">
       <div className="flex space-x-2">
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        <input type="range" min="1" max="10" value={size} onChange={(e) => setSize(Number(e.target.value))} />
+        <input title="Color" type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+        <input title="Range" type="range" min="1" max="10" value={size} onChange={(e) => setSize(Number(e.target.value))} />
       </div>
 
       <canvas

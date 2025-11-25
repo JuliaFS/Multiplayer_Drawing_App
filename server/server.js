@@ -36,7 +36,8 @@ const io = new Server(server, {
 // -------------------------------
 // In-memory board storage
 // -------------------------------
-const boards = {}; // { roomId: [strokes...] }
+const boards = {};      // { roomId: [strokes...] }
+const dirtyRooms = new Set(); // rooms modified since last save
 
 // ==========================================================
 // 🔥 Load room history from Firestore
@@ -48,10 +49,16 @@ async function loadRoomFromFirestore(roomId) {
 
     if (docSnap.exists) {
       boards[roomId] = docSnap.data().strokes || [];
-      console.log(`Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`);
+      console.log(
+        `Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`
+      );
     } else {
       boards[roomId] = [];
     }
+
+    // Mark room as dirty so it gets saved soon after loading (optional)
+    dirtyRooms.add(roomId);
+
   } catch (err) {
     console.error("Error loading room:", err);
     boards[roomId] = [];
@@ -59,21 +66,27 @@ async function loadRoomFromFirestore(roomId) {
 }
 
 // ==========================================================
-// 🔥 Save all rooms to Firestore
+// 🔥 Save only modified rooms to Firestore
 // ==========================================================
 async function saveAllRoomsToFirestore() {
-  console.log("Saving ALL rooms to Firestore...");
+  if (dirtyRooms.size === 0) {
+    console.log("No modified rooms. Skipping save.");
+    return;
+  }
 
-  const savePromises = Object.entries(boards).map(([roomId, strokes]) => {
-    return db.collection("rooms").doc(roomId).set({
+  console.log("Saving modified rooms to Firestore...");
+
+  const savePromises = Array.from(dirtyRooms).map((roomId) =>
+    db.collection("rooms").doc(roomId).set({
       updatedAt: Date.now(),
-      strokes,
-    });
-  });
+      strokes: boards[roomId] || [],
+    })
+  );
 
   try {
     await Promise.all(savePromises);
-    console.log("All rooms saved successfully.");
+    console.log("Saved rooms:", [...dirtyRooms].join(", "));
+    dirtyRooms.clear(); // reset dirty flags
   } catch (err) {
     console.error("Error saving rooms:", err);
   }
@@ -87,7 +100,9 @@ setInterval(saveAllRoomsToFirestore, 30_000);
 // ==========================================================
 // 🔥 Save on shutdown
 // ==========================================================
-async function gracefulShutdown() {
+async function gracefulShutdown(error) {
+  if (error) console.error("Graceful shutdown due to error:", error);
+
   console.log("Server shutting down... Saving rooms first...");
   await saveAllRoomsToFirestore();
   process.exit(0);
@@ -124,6 +139,9 @@ io.on("connection", (socket) => {
 
     boards[roomId].push({ x0, y0, x1, y1, color, size });
 
+    // Mark this room as modified
+    dirtyRooms.add(roomId);
+
     // Broadcast to others in the room
     socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
   });
@@ -138,6 +156,7 @@ io.on("connection", (socket) => {
 // -------------------------------
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
 
 
