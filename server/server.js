@@ -32,7 +32,7 @@ app.use(express.static(distPath));
 
 // SPA fallback for React Router
 app.get(/^\/(?!api).*/, (req, res) => {
-  res.sendFile(path.join(distPath, "dist/index.html"));
+  res.sendFile(path.join(distPath, "index.html"));
 });
 
 // -------------------------------
