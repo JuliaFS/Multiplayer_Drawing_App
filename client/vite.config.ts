@@ -9,7 +9,7 @@
 
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite'
+import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig({
@@ -20,6 +20,11 @@ export default defineConfig({
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
   },
+  build: {
+    outDir: path.resolve(__dirname, 'server/dist'), // Build frontend into server/dist
+    emptyOutDir: true,
+  },
 });
+
 
 
