@@ -21,10 +21,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: path.resolve(__dirname, 'server/dist'), // Build frontend into server/dist
+    outDir: path.resolve(__dirname, '../server/dist'), // Build frontend into server/dist
     emptyOutDir: true,
   },
 });
-
-
-
