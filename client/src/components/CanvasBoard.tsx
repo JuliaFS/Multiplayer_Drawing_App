@@ -59,7 +59,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   // -------------------------------
   useEffect(() => {
     if (!socketRef.current) {
-      socketRef.current = io("http://localhost:5000");
+      socketRef.current = io("https://multiplayer-drawing-app.onrender.com");
     }
     const socket = socketRef.current;
 
