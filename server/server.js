@@ -57,27 +57,25 @@ const dirtyRooms = new Set(); // rooms modified since last save
 // 🔥 Load room history from Firestore
 // ==========================================================
 async function loadRoomFromFirestore(roomId) {
-try {
-const docRef = db.collection("rooms").doc(roomId");
-const docSnap = await docRef.get();
+  try {
+    const docRef = db.collection("rooms").doc(roomId);
+    const docSnap = await docRef.get();
 
-```
-if (docSnap.exists) {
-  boards[roomId] = docSnap.data().strokes || [];
-  console.log(
-    `Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`
-  );
-} else {
-  boards[roomId] = [];
-}
+    if (docSnap.exists) {
+      boards[roomId] = docSnap.data().strokes || [];
+      console.log(
+        `Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`
+      );
+    } else {
+      boards[roomId] = [];
+    }
 
-dirtyRooms.add(roomId);
-```
+    dirtyRooms.add(roomId);
 
-} catch (err) {
-console.error("Error loading room:", err);
-boards[roomId] = [];
-}
+  } catch (err) {
+    console.error("Error loading room:", err);
+    boards[roomId] = [];
+  }
 }
 
 // ==========================================================
