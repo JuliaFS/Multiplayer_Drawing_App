@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { collection, getDocs, setDoc, doc } from "firebase/firestore";
+import HeaderRaw from "./HeaderRaw";
 
 export default function HomePage() {
   const [rooms, setRooms] = useState<string[]>([]);
@@ -36,147 +37,61 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm">
-      {/* Create new room */}
-      <div className="w-full flex flex-col gap-2">
-        <input
-          className="border p-2 rounded w-full"
-          placeholder="Create new room"
-          value={newRoom}
-          onChange={(e) => setNewRoom(e.target.value)}
-          autoComplete="off"
-        />
+    <div>
+      <HeaderRaw />
+      <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm">
+        {/* Create new room */}
+        <div className="w-full flex flex-col gap-2">
+          <input
+            className="border p-2 rounded w-full"
+            placeholder="Create new room"
+            value={newRoom}
+            onChange={(e) => setNewRoom(e.target.value)}
+            autoComplete="off"
+          />
 
-        <button
-          onClick={createRoom}
-          className="px-4 py-2 bg-green-500 text-white rounded"
-        >
-          Create Room
-        </button>
-      </div>
+          <button
+            onClick={createRoom}
+            className="px-4 py-2 bg-green-500 text-white rounded"
+          >
+            Create Room
+          </button>
+        </div>
 
-      {/* Load existing rooms */}
-      <div className="w-full flex flex-col gap-4 mt-6">
-        <button
-          onClick={loadRooms}
-          className="px-4 py-2 bg-purple-500 text-white rounded"
-        >
-          Load Existing Rooms
-        </button>
+        {/* Load existing rooms */}
+        <div className="w-full flex flex-col gap-4 mt-6">
+          <button
+            onClick={loadRooms}
+            className="px-4 py-2 bg-purple-500 text-white rounded"
+          >
+            Load Existing Rooms
+          </button>
 
-        {loading && <p className="text-center text-gray-600">Loading...</p>}
+          {loading && <p className="text-center text-gray-600">Loading...</p>}
 
-        {rooms.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <select
-              title="Available Rooms"
-              className="px-2 py-3 rounded border border-purple-500"
-              defaultValue=""
-              onChange={(e) => {
-                const roomId = e.target.value;
-                if (!roomId) return;
-                navigate(`/room/${roomId}`);
-              }}
-            >
-              <option value="">Choose room</option>
-              {rooms.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+          {rooms.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <select
+                title="Available Rooms"
+                className="px-2 py-3 rounded border border-purple-500"
+                defaultValue=""
+                onChange={(e) => {
+                  const roomId = e.target.value;
+                  if (!roomId) return;
+                  navigate(`/room/${roomId}`);
+                }}
+              >
+                <option value="">Choose room</option>
+                {rooms.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-
-
-// import { onSnapshot, collection, setDoc, doc } from "firebase/firestore";
-// import { useEffect, useState } from "react";
-// import { db } from "../../firebase";
-// import { useNavigate } from "react-router-dom";
-
-// export default function HomePage() {
-//   const [rooms, setRooms] = useState<string[]>([]);
-//   const [newRoom, setNewRoom] = useState("");
-//   const [loading, setLoading] = useState(false);
-//   const navigate = useNavigate();
-
-
-
-// useEffect(() => {
-//   const unsubscribe = onSnapshot(collection(db, "rooms"), (snapshot) => {
-//     const list = snapshot.docs.map((d) => d.id);
-//     setRooms(list);
-//     setLoading(false);
-//   });
-
-//   return () => unsubscribe();
-// }, []);
-
-
-//   async function createRoom() {
-//     if (!newRoom.trim()) return;
-
-//     await setDoc(doc(db, "rooms", newRoom), {
-//       strokes: [],
-//       createdAt: Date.now(),
-//     });
-
-//     navigate(`/room/${newRoom}`);
-//   }
-
-//   return (
-//     <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm">
-//       <div className="w-full flex flex-col gap-2">
-//         <input
-//           className="border p-2 rounded w-full"
-//           placeholder="Create new room"
-//           value={newRoom}
-//           onChange={(e) => setNewRoom(e.target.value)}
-//           autoComplete="off"
-//         />
-
-//         <button
-//           onClick={createRoom}
-//           className="px-4 py-2 bg-green-500 text-white rounded"
-//         >
-//           Create Room
-//         </button>
-//       </div>
-
-//       <div className="w-full flex flex-col gap-4 mt-6">
-//         {loading && <p className="text-center text-gray-600">Loading rooms...</p>}
-
-//         {rooms.length > 0 && (
-//           <div className="flex flex-col gap-2">
-//             <select
-//               title="Available Rooms"
-//               className="px-2 py-3 rounded border border-purple-500"
-//               defaultValue=""
-//               onChange={(e) => {
-//                 const roomId = e.target.value;
-//                 if (!roomId) return;
-//                 // Open in same tab
-//                 navigate(`/room/${roomId}`);
-
-//                 // OR open in new tab
-//                 // window.open(`/room/${roomId}`, "_blank");
-//               }}
-//             >
-//               <option value="">Choose room</option>
-//               {rooms.map((r) => (
-//                 <option key={r} value={r}>
-//                   {r}
-//                 </option>
-//               ))}
-//             </select>
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
-

@@ -61,11 +61,16 @@ async function loadRoomFromFirestore(roomId) {
 
     if (docSnap.exists) {
       boards[roomId] = docSnap.data().strokes || [];
-      console.log(`Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`);
+      console.log(
+        `Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`
+      );
     } else {
       boards[roomId] = [];
       // Optionally create the room in Firestore if it doesn’t exist yet
-      await db.collection("rooms").doc(roomId).set({ strokes: [], updatedAt: Date.now() });
+      await db
+        .collection("rooms")
+        .doc(roomId)
+        .set({ strokes: [], updatedAt: Date.now() });
       console.log(`Created new room ${roomId} in Firestore`);
     }
 
@@ -87,10 +92,13 @@ async function saveAllRoomsToFirestore() {
 
   console.log("Saving modified rooms to Firestore...");
   const savePromises = Array.from(dirtyRooms).map((roomId) =>
-    db.collection("rooms").doc(roomId).set({
-      updatedAt: Date.now(),
-      strokes: boards[roomId] || [],
-    })
+    db
+      .collection("rooms")
+      .doc(roomId)
+      .set({
+        updatedAt: Date.now(),
+        strokes: boards[roomId] || [],
+      })
   );
 
   try {
@@ -149,6 +157,13 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
   });
 
+  socket.on("clear-room", (roomId) => {
+    if (!rooms[roomId]) return;
+
+    rooms[roomId].strokes = [];
+    io.to(roomId).emit("board-cleared");
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
@@ -159,8 +174,3 @@ io.on("connection", (socket) => {
 // -------------------------------
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-
-
-
