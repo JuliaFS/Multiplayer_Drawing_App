@@ -160,16 +160,16 @@ io.on("connection", (socket) => {
   socket.on("clear-room", async (roomId) => {
     console.log(`Room ${roomId} cleared by user.`);
 
-    // reset in-memory strokes
+    // Reset in-memory strokes
     rooms[roomId] = { strokes: [] };
 
-    // save empty strokes to Firestore
+    // Reset Firestore
     await firestore.collection("rooms").doc(roomId).set({
       strokes: [],
       updatedAt: Date.now(),
     });
 
-    // notify all clients
+    // Notify all connected clients
     io.to(roomId).emit("board-cleared");
   });
 
