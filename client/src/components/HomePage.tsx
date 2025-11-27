@@ -1,7 +1,7 @@
-import { onSnapshot, collection, setDoc, doc } from "firebase/firestore";
-import { useEffect, useState } from "react";
-import { db } from "../../firebase";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { db } from "../../firebase";
+import { collection, getDocs, setDoc, doc } from "firebase/firestore";
 
 export default function HomePage() {
   const [rooms, setRooms] = useState<string[]>([]);
@@ -9,19 +9,21 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Load existing rooms only when button is clicked
+  async function loadRooms() {
+    try {
+      setLoading(true);
+      const snap = await getDocs(collection(db, "rooms"));
+      const list = snap.docs.map((d) => d.id);
+      setRooms(list);
+    } catch (err) {
+      console.error("Error loading rooms:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-
-useEffect(() => {
-  const unsubscribe = onSnapshot(collection(db, "rooms"), (snapshot) => {
-    const list = snapshot.docs.map((d) => d.id);
-    setRooms(list);
-    setLoading(false);
-  });
-
-  return () => unsubscribe();
-}, []);
-
-
+  // Create a new room
   async function createRoom() {
     if (!newRoom.trim()) return;
 
@@ -35,6 +37,7 @@ useEffect(() => {
 
   return (
     <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm">
+      {/* Create new room */}
       <div className="w-full flex flex-col gap-2">
         <input
           className="border p-2 rounded w-full"
@@ -52,8 +55,16 @@ useEffect(() => {
         </button>
       </div>
 
+      {/* Load existing rooms */}
       <div className="w-full flex flex-col gap-4 mt-6">
-        {loading && <p className="text-center text-gray-600">Loading rooms...</p>}
+        <button
+          onClick={loadRooms}
+          className="px-4 py-2 bg-purple-500 text-white rounded"
+        >
+          Load Existing Rooms
+        </button>
+
+        {loading && <p className="text-center text-gray-600">Loading...</p>}
 
         {rooms.length > 0 && (
           <div className="flex flex-col gap-2">
@@ -64,11 +75,7 @@ useEffect(() => {
               onChange={(e) => {
                 const roomId = e.target.value;
                 if (!roomId) return;
-                // Open in same tab
                 navigate(`/room/${roomId}`);
-
-                // OR open in new tab
-                // window.open(`/room/${roomId}`, "_blank");
               }}
             >
               <option value="">Choose room</option>
@@ -86,34 +93,30 @@ useEffect(() => {
 }
 
 
-// import { useState } from "react";
-// import { useNavigate } from "react-router-dom";
+// import { onSnapshot, collection, setDoc, doc } from "firebase/firestore";
+// import { useEffect, useState } from "react";
 // import { db } from "../../firebase";
-// import { collection, getDocs, setDoc, doc } from "firebase/firestore";
+// import { useNavigate } from "react-router-dom";
 
 // export default function HomePage() {
-//   const [rooms, setRooms] = useState<string[]>();
+//   const [rooms, setRooms] = useState<string[]>([]);
 //   const [newRoom, setNewRoom] = useState("");
 //   const [loading, setLoading] = useState(false);
 //   const navigate = useNavigate();
 
-//   // Load existing rooms only when button is clicked
-//   async function loadRooms() {
-//     try {
-//       setLoading(true);
 
-//       const snap = await getDocs(collection(db, "rooms"));
-//       const list = snap.docs.map((d) => d.id);
 
-//       setRooms(list);
-//     } catch (err) {
-//       console.error("Error loading rooms:", err);
-//     } finally {
-//       setLoading(false);
-//     }
-//   }
+// useEffect(() => {
+//   const unsubscribe = onSnapshot(collection(db, "rooms"), (snapshot) => {
+//     const list = snapshot.docs.map((d) => d.id);
+//     setRooms(list);
+//     setLoading(false);
+//   });
 
-//   // Create a new room
+//   return () => unsubscribe();
+// }, []);
+
+
 //   async function createRoom() {
 //     if (!newRoom.trim()) return;
 
@@ -127,7 +130,6 @@ useEffect(() => {
 
 //   return (
 //     <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm">
-//       {/* Create new room */}
 //       <div className="w-full flex flex-col gap-2">
 //         <input
 //           className="border p-2 rounded w-full"
@@ -145,23 +147,10 @@ useEffect(() => {
 //         </button>
 //       </div>
 
-//       {/* Load existing rooms */}
 //       <div className="w-full flex flex-col gap-4 mt-6">
-//         <button
-//           onClick={loadRooms}
-//           className="px-4 py-2 bg-purple-500 text-white rounded"
-//         >
-//           Load Existing Rooms
-//         </button>
+//         {loading && <p className="text-center text-gray-600">Loading rooms...</p>}
 
-//         {loading && <p className="text-center text-gray-600">Loading...</p>}
-
-//         {/* {!loading && rooms.length === 0 && (
-//           <p className="text-gray-500 text-center">No rooms loaded</p>
-//         )} */}
-
-//         {/* Room buttons */}
-//         {rooms && (
+//         {rooms.length > 0 && (
 //           <div className="flex flex-col gap-2">
 //             <select
 //               title="Available Rooms"
@@ -171,10 +160,10 @@ useEffect(() => {
 //                 const roomId = e.target.value;
 //                 if (!roomId) return;
 //                 // Open in same tab
-//                 // navigate(`/room/${roomId}`);
+//                 navigate(`/room/${roomId}`);
 
 //                 // OR open in new tab
-//                 window.open(`/room/${roomId}`, "_blank");
+//                 // window.open(`/room/${roomId}`, "_blank");
 //               }}
 //             >
 //               <option value="">Choose room</option>
@@ -190,3 +179,4 @@ useEffect(() => {
 //     </div>
 //   );
 // }
+
