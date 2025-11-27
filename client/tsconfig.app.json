@@ -25,5 +25,5 @@
     "noUncheckedSideEffectImports": true
   },
   "include": ["./src"],
-  "exclude": ["./dist"]
+  "exclude": ["../server/dist"]
 }
