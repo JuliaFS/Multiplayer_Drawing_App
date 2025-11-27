@@ -49,6 +49,7 @@ const io = new Server(server, {
 // In-memory board storage
 // -------------------------------
 const boards = {}; // { roomId: [strokes...] }
+
 const dirtyRooms = new Set(); // rooms modified since last save
 
 // -------------------------------
@@ -161,10 +162,12 @@ io.on("connection", (socket) => {
     console.log(`Room ${roomId} cleared by user.`);
 
     // Reset in-memory strokes
-    rooms[roomId] = { strokes: [] };
+    boards[roomId] = [];
+
+    dirtyRooms.add(roomId);
 
     // Reset Firestore
-    await firestore.collection("rooms").doc(roomId).set({
+    await db.collection("rooms").doc(roomId).set({
       strokes: [],
       updatedAt: Date.now(),
     });
