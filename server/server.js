@@ -33,9 +33,11 @@ const distPath = path.join(__dirname, "dist"); // Vite build output
 app.use(express.static(distPath));
 
 // Fallback to index.html for SPA routing
-app.get("*", (req, res) => {
-res.sendFile(path.join(distPath, "index.html"));
+// Serve React SPA fallback (ignore /api or other server routes if needed)
+app.get(/^\/(?!api).*/, (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
 });
+
 
 // -------------------------------
 // Setup Socket.io
