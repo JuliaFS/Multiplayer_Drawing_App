@@ -9,12 +9,10 @@ const path = require("path");
 // -------------------------------
 const admin = require("firebase-admin");
 
-// const serviceAccount = require("./serviceAccountKey.json"); // downloaded from Firebase
-// const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT);
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
-credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
@@ -32,32 +30,30 @@ const server = http.createServer(app);
 const distPath = path.join(__dirname, "dist"); // Vite build output
 app.use(express.static(distPath));
 
-// Fallback to index.html for SPA routing
-// Serve React SPA fallback (ignore /api or other server routes if needed)
+// SPA fallback for React Router
 app.get(/^\/(?!api).*/, (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
-
 
 // -------------------------------
 // Setup Socket.io
 // -------------------------------
 const io = new Server(server, {
-cors: {
-origin: "*",
-methods: ["GET", "POST"],
-},
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 
 // -------------------------------
 // In-memory board storage
 // -------------------------------
-const boards = {};      // { roomId: [strokes...] }
+const boards = {}; // { roomId: [strokes...] }
 const dirtyRooms = new Set(); // rooms modified since last save
 
-// ==========================================================
-// 🔥 Load room history from Firestore
-// ==========================================================
+// -------------------------------
+// Load room from Firestore
+// -------------------------------
 async function loadRoomFromFirestore(roomId) {
   try {
     const docRef = db.collection("rooms").doc(roomId);
@@ -65,62 +61,57 @@ async function loadRoomFromFirestore(roomId) {
 
     if (docSnap.exists) {
       boards[roomId] = docSnap.data().strokes || [];
-      console.log(
-        `Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`
-      );
+      console.log(`Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`);
     } else {
       boards[roomId] = [];
+      // Optionally create the room in Firestore if it doesn’t exist yet
+      await db.collection("rooms").doc(roomId).set({ strokes: [], updatedAt: Date.now() });
+      console.log(`Created new room ${roomId} in Firestore`);
     }
 
     dirtyRooms.add(roomId);
-
   } catch (err) {
     console.error("Error loading room:", err);
     boards[roomId] = [];
   }
 }
 
-// ==========================================================
-// 🔥 Save only modified rooms to Firestore
-// ==========================================================
+// -------------------------------
+// Save modified rooms to Firestore
+// -------------------------------
 async function saveAllRoomsToFirestore() {
-if (dirtyRooms.size === 0) {
-console.log("No modified rooms. Skipping save.");
-return;
+  if (dirtyRooms.size === 0) {
+    console.log("No modified rooms. Skipping save.");
+    return;
+  }
+
+  console.log("Saving modified rooms to Firestore...");
+  const savePromises = Array.from(dirtyRooms).map((roomId) =>
+    db.collection("rooms").doc(roomId).set({
+      updatedAt: Date.now(),
+      strokes: boards[roomId] || [],
+    })
+  );
+
+  try {
+    await Promise.all(savePromises);
+    console.log("Saved rooms:", [...dirtyRooms].join(", "));
+    dirtyRooms.clear();
+  } catch (err) {
+    console.error("Error saving rooms:", err);
+  }
 }
 
-console.log("Saving modified rooms to Firestore...");
-
-const savePromises = Array.from(dirtyRooms).map((roomId) =>
-db.collection("rooms").doc(roomId).set({
-updatedAt: Date.now(),
-strokes: boards[roomId] || [],
-})
-);
-
-try {
-await Promise.all(savePromises);
-console.log("Saved rooms:", [...dirtyRooms].join(", "));
-dirtyRooms.clear();
-} catch (err) {
-console.error("Error saving rooms:", err);
-}
-}
-
-// ==========================================================
-// 🔥 Auto-save every 30 seconds
-// ==========================================================
+// Auto-save every 30 seconds
 setInterval(saveAllRoomsToFirestore, 30_000);
 
-// ==========================================================
-// 🔥 Save on shutdown
-// ==========================================================
+// Save on shutdown
 async function gracefulShutdown(error) {
-if (error) console.error("Graceful shutdown due to error:", error);
+  if (error) console.error("Graceful shutdown due to error:", error);
 
-console.log("Server shutting down... Saving rooms first...");
-await saveAllRoomsToFirestore();
-process.exit(0);
+  console.log("Server shutting down... Saving rooms first...");
+  await saveAllRoomsToFirestore();
+  process.exit(0);
 }
 
 process.on("SIGINT", gracefulShutdown);
@@ -132,42 +123,35 @@ process.on("unhandledRejection", gracefulShutdown);
 // Socket events
 // -------------------------------
 io.on("connection", (socket) => {
-console.log("User connected:", socket.id);
+  console.log("User connected:", socket.id);
 
-// Join a room
-socket.on("join-room", async (roomId) => {
-socket.join(roomId);
+  socket.on("join-room", async (roomId) => {
+    socket.join(roomId);
 
-```
-if (!boards[roomId]) {
-  await loadRoomFromFirestore(roomId);
-}
+    // Always load room from Firestore if not in memory
+    if (!boards[roomId]) {
+      await loadRoomFromFirestore(roomId);
+    }
 
-// Send existing board history
-socket.emit("init-board", boards[roomId]);
-```
+    // Send current board to client
+    socket.emit("init-board", boards[roomId] || []);
+  });
 
-});
+  socket.on("draw", (data) => {
+    const { roomId, x0, y0, x1, y1, color, size } = data;
 
-// Receive drawing stroke
-socket.on("draw", (data) => {
-const { roomId, x0, y0, x1, y1, color, size } = data;
+    if (!boards[roomId]) boards[roomId] = [];
 
-```
-if (!boards[roomId]) boards[roomId] = [];
+    boards[roomId].push({ x0, y0, x1, y1, color, size });
 
-boards[roomId].push({ x0, y0, x1, y1, color, size });
+    dirtyRooms.add(roomId);
 
-dirtyRooms.add(roomId);
+    socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
+  });
 
-socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
-```
-
-});
-
-socket.on("disconnect", () => {
-console.log("User disconnected:", socket.id);
-});
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
 });
 
 // -------------------------------
@@ -175,6 +159,7 @@ console.log("User disconnected:", socket.id);
 // -------------------------------
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
 
 
