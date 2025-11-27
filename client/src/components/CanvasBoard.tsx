@@ -7,7 +7,7 @@ interface DrawData {
   y0: number;
   x1: number;
   y1: number;
-  color: string; // "__eraser__" or actual hex color
+  color: string; 
   size: number;
 }
 
@@ -22,9 +22,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   const [color, setColor] = useState("#000000");
   const [size, setSize] = useState(3);
 
-  // ------------------------------------------------
-  // Draw function (supports eraser)
-  // ------------------------------------------------
   const drawLine = (
     ctx: CanvasRenderingContext2D,
     x0: number,
@@ -42,7 +39,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     if (strokeColor === "__eraser__") {
       ctx.globalCompositeOperation = "destination-out";
       ctx.strokeStyle = "rgba(0,0,0,1)";
-      ctx.lineWidth = size * 4; // Eraser bigger than pen
+      ctx.lineWidth = size * 4;
     } else {
       ctx.globalCompositeOperation = "source-over";
       ctx.strokeStyle = strokeColor;
@@ -53,9 +50,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     ctx.closePath();
   };
 
-  // ------------------------------------------------
-  // Handle draw events from server
-  // ------------------------------------------------
   const drawHandler = useCallback(
     ({ x0, y0, x1, y1, color, size }: DrawData) => {
       const canvas = canvasRef.current;
@@ -68,21 +62,14 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     []
   );
 
-  // ------------------------------------------------
-  // Clear canvas function
-  // ------------------------------------------------
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas
+      .getContext("2d")
+      ?.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  // ------------------------------------------------
-  // Socket setup
-  // ------------------------------------------------
   useEffect(() => {
     if (!socketRef.current) {
       socketRef.current = io("https://multiplayer-drawing-app.onrender.com");
@@ -114,9 +101,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     };
   }, [roomId, drawHandler, clearCanvas]);
 
-  // ------------------------------------------------
-  // Mouse events
-  // ------------------------------------------------
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -136,13 +120,10 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // current stroke color based on tool
     const strokeColor = tool === "eraser" ? "__eraser__" : color;
 
-    // Draw locally
     drawLine(ctx, prevPos.x, prevPos.y, x, y, strokeColor, size);
 
-    // Emit stroke to server
     socketRef.current?.emit("draw", {
       roomId,
       x0: prevPos.x,
@@ -161,15 +142,11 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     setPrevPos(null);
   };
 
-  // ------------------------------------------------
-  // Render
-  // ------------------------------------------------
   return (
     <div>
       <HeaderRaw />
 
       <div className="flex flex-col items-center space-y-4 mt-8">
-        {/* Tools */}
         <div className="flex space-x-2">
           <button
             onClick={() => setTool("pen")}
@@ -200,10 +177,8 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           </button>
         </div>
 
-        {/* Color + Size */}
         <div className="flex space-x-3 items-center">
           <input
-            title="Color"
             type="color"
             disabled={tool === "eraser"}
             value={color}
@@ -211,7 +186,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           />
 
           <input
-            title="Range"
             type="range"
             min="1"
             max="10"
@@ -220,7 +194,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           />
         </div>
 
-        {/* Canvas */}
         <canvas
           ref={canvasRef}
           width={800}
@@ -234,3 +207,4 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     </div>
   );
 }
+

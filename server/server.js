@@ -157,10 +157,19 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
   });
 
-  socket.on("clear-room", (roomId) => {
-    if (!rooms[roomId]) return;
+  socket.on("clear-room", async (roomId) => {
+    console.log(`Room ${roomId} cleared by user.`);
 
-    rooms[roomId].strokes = [];
+    // reset in-memory strokes
+    rooms[roomId] = { strokes: [] };
+
+    // save empty strokes to Firestore
+    await firestore.collection("rooms").doc(roomId).set({
+      strokes: [],
+      updatedAt: Date.now(),
+    });
+
+    // notify all clients
     io.to(roomId).emit("board-cleared");
   });
 
