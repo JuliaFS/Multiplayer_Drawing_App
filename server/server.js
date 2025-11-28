@@ -137,27 +137,24 @@ io.on("connection", (socket) => {
   socket.on("join-room", async (roomId) => {
     socket.join(roomId);
 
-    // Always load room from Firestore if not in memory
     if (!boards[roomId]) {
       await loadRoomFromFirestore(roomId);
     }
 
-    // Send current board to client
     socket.emit("init-board", boards[roomId] || []);
-    socket.emit("cursor-move", { roomId, x, y });
 
-    socket.on("cursor-move", ({ roomId, x, y }) => {
+    // --------- LIVE CURSOR HANDLERS ----------
+    socket.on("cursor-move", ({ roomId, x, y, color }) => {
       socket.to(roomId).emit("cursor-update", {
-        userId: socket.id,
+        socketId: socket.id,
         x,
         y,
+        color,
       });
     });
 
     socket.on("cursor-leave", ({ roomId }) => {
-      socket.to(roomId).emit("cursor-remove", {
-        userId: socket.id,
-      });
+      socket.to(roomId).emit("cursor-remove", socket.id);
     });
   });
 
