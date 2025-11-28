@@ -144,6 +144,21 @@ io.on("connection", (socket) => {
 
     // Send current board to client
     socket.emit("init-board", boards[roomId] || []);
+    socket.emit("cursor-move", { roomId, x, y });
+
+    socket.on("cursor-move", ({ roomId, x, y }) => {
+      socket.to(roomId).emit("cursor-update", {
+        userId: socket.id,
+        x,
+        y,
+      });
+    });
+
+    socket.on("cursor-leave", ({ roomId }) => {
+      socket.to(roomId).emit("cursor-remove", {
+        userId: socket.id,
+      });
+    });
   });
 
   socket.on("draw", (data) => {
@@ -156,6 +171,17 @@ io.on("connection", (socket) => {
     dirtyRooms.add(roomId);
 
     socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
+  });
+
+  socket.on("commit-stroke", ({ roomId, stroke }) => {
+    if (!roomId || !stroke) return;
+
+    if (!boards[roomId]) boards[roomId] = [];
+
+    boards[roomId].push(stroke);
+    dirtyRooms.add(roomId);
+
+    socket.to(roomId).emit("commit-stroke", stroke);
   });
 
   socket.on("clear-room", async (roomId) => {
