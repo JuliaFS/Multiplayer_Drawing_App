@@ -48,7 +48,10 @@ const io = new Server(server, {
 // -------------------------------
 // In-memory board storage
 // -------------------------------
-const boards = {}; // { roomId: [strokes...] }
+const rooms = {}; // { roomId: { strokes: [], users: { socketId: username } } }
+
+// This can be removed as we are merging it into the `rooms` object.
+// const boards = {}; // { roomId: [strokes...] }
 
 const dirtyRooms = new Set(); // rooms modified since last save
 
@@ -61,12 +64,13 @@ async function loadRoomFromFirestore(roomId) {
     const docSnap = await docRef.get();
 
     if (docSnap.exists) {
-      boards[roomId] = docSnap.data().strokes || [];
+      const strokes = docSnap.data().strokes || [];
+      rooms[roomId] = { strokes, users: {} };
       console.log(
-        `Loaded room ${roomId} from Firestore (${boards[roomId].length} strokes)`
+        `Loaded room ${roomId} from Firestore (${rooms[roomId].strokes.length} strokes)`
       );
     } else {
-      boards[roomId] = [];
+      rooms[roomId] = { strokes: [], users: {} };
       // Optionally create the room in Firestore if it doesn’t exist yet
       await db
         .collection("rooms")
@@ -78,7 +82,7 @@ async function loadRoomFromFirestore(roomId) {
     dirtyRooms.add(roomId);
   } catch (err) {
     console.error("Error loading room:", err);
-    boards[roomId] = [];
+    rooms[roomId] = { strokes: [], users: {} };
   }
 }
 
@@ -98,7 +102,7 @@ async function saveAllRoomsToFirestore() {
       .doc(roomId)
       .set({
         updatedAt: Date.now(),
-        strokes: boards[roomId] || [],
+        strokes: rooms[roomId]?.strokes || [],
       })
   );
 
@@ -134,22 +138,32 @@ process.on("unhandledRejection", gracefulShutdown);
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join-room", async (roomId) => {
+  socket.on("join-room", async ({ roomId, username }) => {
     socket.join(roomId);
+    socket.data.username = username;
+    socket.data.roomId = roomId;
 
-    if (!boards[roomId]) {
+    if (!rooms[roomId]) {
       await loadRoomFromFirestore(roomId);
     }
 
-    socket.emit("init-board", boards[roomId] || []);
+    // Add user to the room
+    rooms[roomId].users[socket.id] = username;
+
+    // Send board history to the new user
+    socket.emit("init-board", rooms[roomId].strokes || []);
+
+    // Notify others in the room about the new user and send updated user list
+    io.to(roomId).emit("update-user-list", Object.values(rooms[roomId].users));
 
     // --------- LIVE CURSOR HANDLERS ----------
-    socket.on("cursor-move", ({ roomId, x, y, color }) => {
+    socket.on("cursor-move", ({ roomId, x, y, color, username }) => {
       socket.to(roomId).emit("cursor-update", {
         socketId: socket.id,
         x,
         y,
         color,
+        username,
       });
     });
 
@@ -161,41 +175,20 @@ io.on("connection", (socket) => {
   socket.on("draw", (data) => {
     const { roomId, x0, y0, x1, y1, color, size } = data;
 
-    if (!boards[roomId]) boards[roomId] = [];
+    if (!rooms[roomId]) rooms[roomId] = { strokes: [], users: {} };
 
-    boards[roomId].push({ x0, y0, x1, y1, color, size });
+    rooms[roomId].strokes.push({ x0, y0, x1, y1, color, size });
 
     dirtyRooms.add(roomId);
 
     socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
   });
 
-  socket.on("text", ({ roomId, x, y, text, color, fontSize, fontFamily }) => {
-    // Broadcast to other users in the room
-    socket.to(roomId).emit("text", { x, y, text, color, fontSize, fontFamily });
-
-    // Store in the board history
-    if (!boards[roomId]) {
-      boards[roomId] = [];
-    }
-    boards[roomId].push({
-      type: "text",
-      x,
-      y,
-      text,
-      color,
-      fontSize,
-      fontFamily,
-    });
-
-    dirtyRooms.add(roomId);
-  });
-
   socket.on("commit-stroke", ({ roomId, stroke }) => {
     if (!roomId || !stroke) return;
 
-    if (!boards[roomId]) boards[roomId] = [];
-    boards[roomId].push(stroke);
+    if (!rooms[roomId]) rooms[roomId] = { strokes: [], users: {} };
+    rooms[roomId].strokes.push(stroke);
     dirtyRooms.add(roomId);
 
     socket.to(roomId).emit("commit-stroke", stroke);
@@ -205,7 +198,7 @@ io.on("connection", (socket) => {
     console.log(`Room ${roomId} cleared by user.`);
 
     // Reset in-memory strokes
-    boards[roomId] = [];
+    if (rooms[roomId]) rooms[roomId].strokes = [];
 
     dirtyRooms.add(roomId);
 
@@ -219,8 +212,24 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("board-cleared");
   });
 
+  socket.on("send-message", ({ roomId, username, text }) => {
+    io.to(roomId).emit("new-message", { username, text });
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
+    const { roomId } = socket.data;
+
+    if (roomId && rooms[roomId] && rooms[roomId].users) {
+      // Remove user from the room
+      delete rooms[roomId].users[socket.id];
+
+      // Notify others in the room about the user leaving and send updated list
+      io.to(roomId).emit("update-user-list", Object.values(rooms[roomId].users));
+
+      // Also remove their cursor
+      io.to(roomId).emit("cursor-remove", socket.id);
+    }
   });
 });
 
