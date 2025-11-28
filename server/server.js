@@ -213,7 +213,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", ({ roomId, username, text }) => {
-    io.to(roomId).emit("new-message", { username, text });
+    io.to(roomId).emit("new-message", { username, text, socketId: socket.id });
   });
 
   socket.on("disconnect", () => {

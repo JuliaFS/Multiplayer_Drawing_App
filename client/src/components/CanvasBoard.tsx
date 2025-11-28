@@ -39,6 +39,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   interface Message {
     username: string;
     text: string;
+    socketId?: string; // Add socketId to identify sender
   }
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -117,12 +118,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     redrawBoard();
   }, [redrawBoard]);
 
-  // Prompt for username on component mount
-  useEffect(() => {
-    const name = prompt("Please enter your name:");
-    setUsername(name || `User-${Math.random().toString(16).slice(2, 6)}`);
-  }, []);
-
   useEffect(() => {
     if (!username) return; // Don't connect until username is set
 
@@ -168,7 +163,10 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     });
 
     socket.on("new-message", (message: Message) => {
-      setMessages((prev) => [...prev, message]);
+      // Ignore message if it's from the current user (already added optimistically)
+      if (message.socketId === socket.id) return;
+
+      setMessages((prev) => [...prev, { username: message.username, text: message.text }]);
     });
 
     // Resize listener
@@ -291,7 +289,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     e.preventDefault();
     if (chatInput.trim() && username) {
       socketRef.current?.emit("send-message", { roomId, username, text: chatInput });
-      setMessages((prev) => [...prev, { username: "You", text: chatInput }]); // Optimistic update
+      setMessages((prev) => [...prev, { username: "You", text: chatInput, socketId: socketRef.current?.id }]); // Optimistic update
       setChatInput("");
     }
   };
@@ -323,9 +321,36 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-gray-100">
+      {!username && (
+        <div className="absolute inset-0 bg-gray-700 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl w-11/12 max-w-sm">
+            <h2 className="text-2xl font-bold mb-4 text-center">Enter Your Name</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const input = form.elements.namedItem("username") as HTMLInputElement;
+                const finalUsername = input.value.trim() || `User-${Math.random().toString(16).slice(2, 6)}`;
+                setUsername(finalUsername);
+              }}
+            >
+              <input
+                name="username"
+                type="text"
+                className="w-full border p-2 rounded mb-4"
+                placeholder="Your name..."
+                autoFocus
+              />
+              <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
+                Join Room
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       {" "}
       <HeaderRaw />{" "}
-      <div className="flex flex-grow overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-grow overflow-hidden">
         {/* Main Content */}
         <div className="flex flex-col items-center p-4 space-y-4 flex-grow">
           {" "}
@@ -373,7 +398,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           />
         </div>
         {/* Canvas Container */}
-        <div className="relative w-full h-full max-w-[800px] max-h-[600px] aspect-[4/3]">
+        <div className="relative w-full h-full max-w-[800px] max-h-[600px] aspect-4/3">
           {renderCursors()}
           <canvas
             ref={canvasRef}
@@ -390,19 +415,19 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
         </div>
 
         {/* Side Panel */}
-        <div className="w-64 bg-white border-l p-4 flex flex-col space-y-4">
+        <div className="w-full lg:w-72 lg:flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l p-4 flex flex-col space-y-4">
           {/* Who's Online */}
           <div>
             <h3 className="font-bold text-lg mb-2">Who's Online ({activeUsers.length})</h3>
             <ul className="list-disc list-inside">
               {activeUsers.map((user, index) => (
-                <li key={index} className="truncate">{user}</li>
+                <li key={index} className="truncate" title={user}>{user}</li>
               ))}
             </ul>
           </div>
 
           {/* Chat */}
-          <div className="flex-grow flex flex-col border-t pt-4">
+          <div className="flex-grow flex flex-col border-t pt-4 min-h-0">
             <h3 className="font-bold text-lg mb-2">Chat</h3>
             <div className="flex-grow bg-gray-50 p-2 rounded border overflow-y-auto mb-2">
               {messages.map((msg, index) => (
