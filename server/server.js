@@ -170,11 +170,31 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("draw", { x0, y0, x1, y1, color, size });
   });
 
+  socket.on("text", ({ roomId, x, y, text, color, fontSize, fontFamily }) => {
+    // Broadcast to other users in the room
+    socket.to(roomId).emit("text", { x, y, text, color, fontSize, fontFamily });
+
+    // Store in the board history
+    if (!boards[roomId]) {
+      boards[roomId] = [];
+    }
+    boards[roomId].push({
+      type: "text",
+      x,
+      y,
+      text,
+      color,
+      fontSize,
+      fontFamily,
+    });
+
+    dirtyRooms.add(roomId);
+  });
+
   socket.on("commit-stroke", ({ roomId, stroke }) => {
     if (!roomId || !stroke) return;
 
     if (!boards[roomId]) boards[roomId] = [];
-
     boards[roomId].push(stroke);
     dirtyRooms.add(roomId);
 

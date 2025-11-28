@@ -21,16 +21,25 @@ interface CursorData {
 export default function CanvasBoard({ roomId }: { roomId: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const boards = useRef<any[]>([]);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [prevPos, setPrevPos] = useState<{ x: number; y: number } | null>(null);
 
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const [tool, setTool] = useState<"pen" | "eraser" | "text">("pen");
   const [color, setColor] = useState("#000000");
   const [size, setSize] = useState(3);
 
-  // LIVE CURSOR STORE
+  const [fontSize, setFontSize] = useState(20);
+  const [fontFamily, setFontFamily] = useState("Arial");
+
   const [cursors, setCursors] = useState<Record<string, CursorData>>({});
+
+  const [textInput, setTextInput] = useState("");
+  const [textPosition, setTextPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   const drawLine = (
     ctx: CanvasRenderingContext2D,
@@ -77,12 +86,11 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  // -------------------------------
-  // SOCKET INIT
-  // -------------------------------
   useEffect(() => {
     if (!socketRef.current) {
-      socketRef.current = io("https://multiplayer-drawing-app.onrender.com");
+      socketRef.current = io(
+        "https://multiplayer-drawing-app.onrender.com"
+      );
     }
 
     const socket = socketRef.current;
@@ -101,9 +109,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 
     socket.on("board-cleared", clearCanvas);
 
-    // -----------------------------
-    // LIVE CURSOR EVENTS
-    // -----------------------------
     socket.on("cursor-update", (data: CursorData) => {
       setCursors((prev) => ({ ...prev, [data.socketId]: data }));
     });
@@ -116,24 +121,39 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       });
     });
 
+    socket.on("text", (data) => {
+      const ctx = canvasRef.current!.getContext("2d")!;
+      ctx.font = `${data.fontSize}px ${data.fontFamily}`;
+      ctx.fillStyle = data.color;
+      ctx.fillText(data.text, data.x, data.y);
+
+      boards.current.push({
+        type: "text",
+        ...data,
+      });
+    });
+
     return () => {
       socket.off("draw", drawHandler);
       socket.off("init-board");
       socket.off("board-cleared");
       socket.off("cursor-update");
       socket.off("cursor-remove");
+      socket.off("text");
     };
   }, [roomId, drawHandler, clearCanvas]);
 
-  // -------------------------------
-  // MOUSE DRAWING
-  // -------------------------------
   const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (tool === "text") {
+      setTextPosition(getMousePos(e));
+      setTextInput("");
+      return;
+    }
     setIsDrawing(true);
     setPrevPos(getMousePos(e));
   };
@@ -141,13 +161,12 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const pos = getMousePos(e);
 
-    // 🎯 SEND LIVE CURSOR WITH MY SOCKET ID
     socketRef.current?.emit("cursor-move", {
       roomId,
       x: pos.x,
       y: pos.y,
       color,
-      socketId: socketRef.current.id, // FIX ADDED
+      socketId: socketRef.current.id,
     });
 
     if (!isDrawing || !prevPos) return;
@@ -175,9 +194,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     setPrevPos(null);
   };
 
-  // -------------------------------
-  // TOUCH EVENTS
-  // -------------------------------
   const getTouchPos = (e: TouchEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const touch = e.touches[0];
@@ -228,9 +244,6 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     setPrevPos(null);
   };
 
-  // -------------------------------
-  // RENDER LIVE CURSORS
-  // -------------------------------
   const renderCursors = () => {
     return Object.values(cursors).map((cursor) => (
       <div
@@ -248,17 +261,49 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             backgroundColor: cursor.color,
             border: "2px solid white",
           }}
-        ></div>
+        ></div>{" "}
       </div>
     ));
   };
 
+  const placeText = () => {
+    if (!textPosition || !textInput.trim()) return;
+
+    const ctx = canvasRef.current!.getContext("2d")!;
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.fillStyle = color;
+    ctx.fillText(textInput, textPosition.x, textPosition.y);
+
+    socketRef.current?.emit("text", {
+      roomId,
+      x: textPosition.x,
+      y: textPosition.y,
+      text: textInput,
+      color: color,
+      fontSize,
+      fontFamily,
+    });
+
+    boards.current.push({
+      type: "text",
+      x: textPosition.x,
+      y: textPosition.y,
+      text: textInput,
+      color: color,
+      fontSize,
+      fontFamily,
+    });
+
+    setTextPosition(null);
+    setTextInput("");
+  };
+
   return (
     <div>
-      <HeaderRaw />
-
+      {" "}
+      <HeaderRaw />{" "}
       <div className="flex flex-col items-center space-y-4 mt-8 relative">
-        {/* TOOLBAR */}
+        {" "}
         <div className="flex space-x-2">
           <button
             onClick={() => setTool("pen")}
@@ -266,18 +311,21 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
               tool === "pen" ? "bg-blue-500 text-white" : "bg-gray-300"
             }`}
           >
-            Pen
+            Pen{" "}
           </button>
-
           <button
             onClick={() => setTool("eraser")}
             className={`px-4 py-2 rounded ${
               tool === "eraser" ? "bg-blue-500 text-white" : "bg-gray-300"
             }`}
           >
-            Eraser
+            Eraser{" "}
           </button>
-
+          <button className={`px-4 py-2 rounded ${
+              tool === "text" ? "bg-green-400 text-white" : "bg-gray-300"
+            }`} onClick={() => setTool("text")
+            
+          }>Text</button>
           <button
             onClick={() => {
               clearCanvas();
@@ -285,31 +333,48 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             }}
             className="px-4 py-2 bg-red-500 text-white rounded"
           >
-            Clear Board
-          </button>
+            Clear Board{" "}
+          </button>{" "}
         </div>
-
-        {/* COLOR + SIZE */}
         <div className="flex space-x-3 items-center">
           <input
             type="color"
             disabled={tool === "eraser"}
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            placeholder="eraser"
           />
-
           <input
             type="range"
             min="1"
             max="10"
             value={size}
             onChange={(e) => setSize(Number(e.target.value))}
-            placeholder="size"
           />
-        </div>
 
-        {/* CANVAS + CURSORS */}
+          {/* FONT SIZE & FAMILY */}
+          {tool === "text" && (
+            <>
+              <input
+                type="number"
+                min={10}
+                max={100}
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+                className="w-16 border p-1 rounded"
+              />
+              <select
+                value={fontFamily}
+                onChange={(e) => setFontFamily(e.target.value)}
+                className="border p-1 rounded"
+              >
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Verdana">Verdana</option>
+              </select>
+            </>
+          )}
+        </div>
         <div className="relative">
           {renderCursors()}
 
@@ -326,14 +391,32 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           />
+
+          {textPosition && (
+            <input
+              autoFocus
+              className="absolute border p-1 bg-white text-black"
+              style={{
+                left: textPosition.x,
+                top: textPosition.y,
+                transform: "translateY(-100%)",
+                fontSize: fontSize,
+                fontFamily: fontFamily,
+              }}
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  placeText();
+                }
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-
-
 
 // import { useEffect, useRef, useState, useCallback } from "react";
 // import io from "socket.io-client";
@@ -344,7 +427,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 //   y0: number;
 //   x1: number;
 //   y1: number;
-//   color: string; 
+//   color: string;
 //   size: number;
 // }
 
@@ -546,4 +629,3 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 //     </div>
 //   );
 // }
-
