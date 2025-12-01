@@ -125,6 +125,27 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   }, [redrawBoard]);
 
   useEffect(() => {
+  const reliableResize = () => {
+    canvasRef.current!.width = 0;
+    canvasRef.current!.height = 0;
+
+    setTimeout(() => {
+      resizeCanvas();   // redraw after new size
+    }, 250);
+  };
+
+  window.addEventListener("orientationchange", reliableResize);
+  window.addEventListener("resize", reliableResize);
+
+  return () => {
+    window.removeEventListener("orientationchange", reliableResize);
+    window.removeEventListener("resize", reliableResize);
+  };
+}, [resizeCanvas]);
+
+
+
+  useEffect(() => {
     if (!username) return; // Don't connect until username is set
 
     if (!socketRef.current) {
