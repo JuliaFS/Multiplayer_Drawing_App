@@ -476,7 +476,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           {/* Chat */}
           <div className="flex-grow flex flex-col border-t pt-4 min-h-0">
             <h3 className="font-bold text-lg mb-2">Chat</h3>
-            <div className="h-32 bg-gray-50 p-2 rounded border overflow-y-auto mb-2">
+            <div className="h-56 bg-gray-50 p-2 rounded border overflow-y-auto mb-2">
               {messages.map((msg, index) => (
                 <div key={index} className="text-sm mb-1">
                   <span className="font-semibold">{msg.username}: </span>
