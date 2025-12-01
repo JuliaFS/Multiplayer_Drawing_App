@@ -269,14 +269,12 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
     const touch = getTouchPos(e.nativeEvent);
     setIsDrawing(true);
     setPrevPos(touch);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
     const pos = getTouchPos(e.nativeEvent);
 
     socketRef.current?.emit("cursor-move", {
