@@ -414,7 +414,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           Go to Home
         </button>
       </div>
-      <div className="flex flex-col lg:flex-row flex-grow overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-grow overflow-y-auto lg:overflow-hidden">
         {/* Main Content */}
         <div className="flex flex-col items-center p-4 space-y-4 lg:flex-grow w-full">
           {" "}
