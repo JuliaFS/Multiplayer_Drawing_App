@@ -383,6 +383,14 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       )}
       {" "}
       <HeaderRaw />{" "}
+      <div className="p-2 bg-gray-200 flex justify-between items-center shadow-sm">
+        <p className="text-sm text-gray-700">
+          You are in room: <strong className="font-semibold">{roomId}</strong>
+        </p>
+        <button onClick={() => (window.location.href = "/")} className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600">
+          Go to Home
+        </button>
+      </div>
       <div className="flex flex-col lg:flex-row flex-grow overflow-hidden">
         {/* Main Content */}
         <div className="flex flex-col items-center p-4 space-y-4 lg:flex-grow w-full">

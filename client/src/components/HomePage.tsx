@@ -39,7 +39,7 @@ export default function HomePage() {
   return (
     <div>
       <HeaderRaw />
-      <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm">
+      <div className="flex flex-col items-center mx-auto gap-6 mt-20 w-full max-w-sm p-4">
         {/* Create new room */}
         <div className="w-full flex flex-col gap-2">
           <input
