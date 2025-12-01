@@ -34,7 +34,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 
   const [cursors, setCursors] = useState<Record<string, CursorData>>({});
   const [username, setUsername] = useState(
-    () => localStorage.getItem("drawing-app-username") || ""
+    () => sessionStorage.getItem("drawing-app-username") || ""
   );
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
@@ -367,7 +367,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
                 const input = form.elements.namedItem("username") as HTMLInputElement;
                 const finalUsername = input.value.trim() || `User-${Math.random().toString(16).slice(2, 6)}`;
                 setUsername(finalUsername);
-                localStorage.setItem("drawing-app-username", finalUsername);
+                sessionStorage.setItem("drawing-app-username", finalUsername);
               }}
             >
               <input
