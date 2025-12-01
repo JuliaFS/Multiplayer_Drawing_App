@@ -481,13 +481,13 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
         </div>
 
         {/* Side Panel */}
-        <div className="w-full lg:w-96 lg:flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l p-4 flex flex-col space-y-4 flex-grow min-h-0">
+        <div className="w-full lg:w-96 lg:flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l flex flex-col flex-grow min-h-0">
           {/* Who's Online */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 p-4">
             <h3 className="font-bold text-lg mb-2">
               Who's Online ({activeUsers.length})
             </h3>
-            <ul className="list-disc list-inside max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
+            <ul className="list-disc list-inside h-32 lg:h-40 overflow-y-auto border rounded p-2 bg-gray-50">
               {activeUsers.map((user, index) => (
                 <li key={index} className="truncate" title={user}>
                   {user}
@@ -497,9 +497,9 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
           </div>
 
           {/* Chat */}
-          <div className="flex-grow flex flex-col border-t pt-4 min-h-56">
+          <div className="flex-grow flex flex-col border-t p-4 min-h-56 bg-white w-full">
             <h3 className="font-bold text-lg mb-2">Chat</h3>
-            <div className="h-56 bg-gray-50 p-2 rounded border overflow-y-auto mb-2">
+            <div className="h-56 lg:h-80 bg-white p-2 rounded border overflow-y-auto mb-2">
               {messages.map((msg, index) => (
                 <div key={index} className="text-sm mb-1">
                   <span className="font-semibold">{msg.username}: </span>
