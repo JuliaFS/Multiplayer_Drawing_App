@@ -195,8 +195,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("clear-room", async (roomId) => {
-    console.log(`Room ${roomId} cleared by user.`);
-
     // Reset in-memory strokes
     if (rooms[roomId]) rooms[roomId].strokes = [];
 
@@ -217,7 +215,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
     const { roomId } = socket.data;
 
     if (roomId && rooms[roomId] && rooms[roomId].users) {
