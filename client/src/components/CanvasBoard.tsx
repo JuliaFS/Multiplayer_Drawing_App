@@ -22,8 +22,8 @@ interface CursorData {
 
 export default function CanvasBoard({ roomId }: { roomId: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const socketRef = useRef<ReturnType<typeof io> | null>(null);
-  const boards = useRef<any[]>([]);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null); // prettier-ignore
+  const boards = useRef<Stroke[]>([]);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [prevPos, setPrevPos] = useState<{ x: number; y: number } | null>(null);
@@ -72,16 +72,20 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     ctx.closePath();
   };
 
-  const drawHandler = useCallback(
-    ({ x0, y0, x1, y1, color, size }: Stroke) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      drawLine(ctx, x0, y0, x1, y1, color, size);
-    },
-    []
-  );
+  const drawHandler = ({ x0, y0, x1, y1, color, size }: Stroke) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // De-normalize coordinates for drawing
+    const currentX0 = x0 * canvas.width;
+    const currentY0 = y0 * canvas.height;
+    const currentX1 = x1 * canvas.width;
+    const currentY1 = y1 * canvas.height;
+
+    drawLine(ctx, currentX0, currentY0, currentX1, currentY1, color, size);
+  };
 
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -102,10 +106,10 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     // Redraw from history
     boards.current.forEach((item) => {
       if (item.type !== "text") {
-        drawLine(ctx, item.x0, item.y0, item.x1, item.y1, item.color, item.size);
+        drawHandler(item); // Use drawHandler to de-normalize and draw
       }
     });
-  }, []);
+  }, []); // drawHandler is now stable, but we can leave this empty as it's part of the component's render scope
 
   // Handle canvas resizing
   const resizeCanvas = useCallback(() => {
@@ -131,7 +135,19 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 
     socket.emit("join-room", { roomId, username });
 
-    socket.on("draw", drawHandler);
+    // We need a stable function for the socket listener that doesn't depend on component re-renders.
+    const stableDrawHandler = (stroke: Stroke) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const { x0, y0, x1, y1, color, size } = stroke;
+      const currentX0 = x0 * canvas.width;
+      const currentY0 = y0 * canvas.height;
+      const currentX1 = x1 * canvas.width;
+      const currentY1 = y1 * canvas.height;
+      drawLine(ctx, currentX0, currentY0, currentX1, currentY1, color, size);
+    };
 
     socket.on("init-board", (history: Stroke[]) => {
       const canvas = canvasRef.current;
@@ -144,7 +160,10 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       resizeCanvas(); // This will also call redrawBoard
     });
 
-    socket.on("board-cleared", clearCanvas);
+    socket.on("draw", stableDrawHandler);
+
+    // clearCanvas is wrapped in useCallback, so it's stable.
+    socket.on("board-cleared", clearCanvas); 
 
     socket.on("cursor-update", (data: CursorData) => {
       setCursors((prev) => ({ ...prev, [data.socketId]: data }));
@@ -174,7 +193,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     resizeCanvas(); // Initial resize
 
     return () => {
-      socket.off("draw", drawHandler);
+      socket.off("draw", stableDrawHandler);
       socket.off("init-board");
       socket.off("board-cleared");
       socket.off("cursor-update");
@@ -183,7 +202,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       socket.off("new-message");
       window.removeEventListener("resize", resizeCanvas);
     };
-  }, [roomId, username, drawHandler, clearCanvas, resizeCanvas]);
+  }, [roomId, username, clearCanvas, resizeCanvas]);
 
   const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -209,18 +228,26 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 
     if (!isDrawing || !prevPos) return;
 
-    const ctx = canvasRef.current!.getContext("2d")!;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
     const strokeColor = tool === "eraser" ? "__eraser__" : color;
 
     drawLine(ctx, prevPos.x, prevPos.y, pos.x, pos.y, strokeColor, size);
-    boards.current.push({ x0: prevPos.x, y0: prevPos.y, x1: pos.x, y1: pos.y, color: strokeColor, size });
+
+    // Normalize coordinates before storing and emitting
+    const x0 = prevPos.x / canvas.width;
+    const y0 = prevPos.y / canvas.height;
+    const x1 = pos.x / canvas.width;
+    const y1 = pos.y / canvas.height;
+
+    boards.current.push({ x0, y0, x1, y1, color: strokeColor, size });
 
     socketRef.current?.emit("draw", {
       roomId,
-      x0: prevPos.x,
-      y0: prevPos.y,
-      x1: pos.x,
-      y1: pos.y,
+      x0,
+      y0,
+      x1,
+      y1,
       color: strokeColor,
       size,
     });
@@ -240,14 +267,12 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
     const touch = getTouchPos(e.nativeEvent);
     setIsDrawing(true);
     setPrevPos(touch);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
     const pos = getTouchPos(e.nativeEvent);
 
     socketRef.current?.emit("cursor-move", {
@@ -261,18 +286,26 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
 
     if (!isDrawing || !prevPos) return;
 
-    const ctx = canvasRef.current!.getContext("2d")!;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
     const strokeColor = tool === "eraser" ? "__eraser__" : color;
 
     drawLine(ctx, prevPos.x, prevPos.y, pos.x, pos.y, strokeColor, size);
-    boards.current.push({ x0: prevPos.x, y0: prevPos.y, x1: pos.x, y1: pos.y, color: strokeColor, size });
+
+    // Normalize coordinates before storing and emitting
+    const x0 = prevPos.x / canvas.width;
+    const y0 = prevPos.y / canvas.height;
+    const x1 = pos.x / canvas.width;
+    const y1 = pos.y / canvas.height;
+
+    boards.current.push({ x0, y0, x1, y1, color: strokeColor, size });
 
     socketRef.current?.emit("draw", {
       roomId,
-      x0: prevPos.x,
-      y0: prevPos.y,
-      x1: pos.x,
-      y1: pos.y,
+      x0,
+      y0,
+      x1,
+      y1,
       color: strokeColor,
       size,
     });
@@ -352,7 +385,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       <HeaderRaw />{" "}
       <div className="flex flex-col lg:flex-row flex-grow overflow-hidden">
         {/* Main Content */}
-        <div className="flex flex-col items-center p-4 space-y-4 flex-grow">
+        <div className="flex flex-col items-center p-4 space-y-4 lg:flex-grow w-full">
           {" "}
           {/* Toolbar */}
         <div className="flex space-x-2">
@@ -388,6 +421,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             disabled={tool === "eraser"}
             value={color}
             onChange={(e) => setColor(e.target.value)}
+            placeholder="eraser"
           />
           <input
             type="range"
@@ -395,14 +429,15 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             max="10"
             value={size}
             onChange={(e) => setSize(Number(e.target.value))}
+            placeholder="size"
           />
         </div>
         {/* Canvas Container */}
-        <div className="relative w-full h-full max-w-[800px] max-h-[600px] aspect-4/3">
+        <div className="relative w-full max-w-[800px] max-h-[600px] aspect-4/3">
           {renderCursors()}
           <canvas
             ref={canvasRef}
-            className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full"
+            className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-action-none"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -415,7 +450,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
         </div>
 
         {/* Side Panel */}
-        <div className="w-full lg:w-72 lg:flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l p-4 flex flex-col space-y-4">
+        <div className="w-full lg:w-96 lg:flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l p-4 flex flex-col space-y-4 flex-grow min-h-0">
           {/* Who's Online */}
           <div>
             <h3 className="font-bold text-lg mb-2">Who's Online ({activeUsers.length})</h3>
@@ -442,10 +477,10 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                className="flex-grow border rounded-l p-2"
+                className="grow border rounded-l p-2 min-w-0 mr-2"
                 placeholder="Say something..."
               />
-              <button type="submit" className="bg-blue-500 text-white px-4 rounded-r">Send</button>
+              <button type="submit" className="bg-blue-500 text-white px-4 rounded-r flex-shrink-0">Send</button>
             </form>
           </div>
         </div>
