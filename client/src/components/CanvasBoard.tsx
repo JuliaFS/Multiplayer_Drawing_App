@@ -128,9 +128,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     if (!username) return; // Don't connect until username is set
 
     if (!socketRef.current) {
-      socketRef.current = io(
-        "https://multiplayer-drawing-app.onrender.com"
-      );
+      socketRef.current = io("https://multiplayer-drawing-app.onrender.com");
     }
 
     const socket = socketRef.current;
@@ -165,7 +163,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     socket.on("draw", stableDrawHandler);
 
     // clearCanvas is wrapped in useCallback, so it's stable.
-    socket.on("board-cleared", clearCanvas); 
+    socket.on("board-cleared", clearCanvas);
 
     socket.on("cursor-update", (data: CursorData) => {
       setCursors((prev) => ({ ...prev, [data.socketId]: data }));
@@ -187,7 +185,10 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       // Ignore message if it's from the current user (already added optimistically)
       if (message.socketId === socket.id) return;
 
-      setMessages((prev) => [...prev, { username: message.username, text: message.text }]);
+      setMessages((prev) => [
+        ...prev,
+        { username: message.username, text: message.text },
+      ]);
     });
 
     // Resize listener
@@ -324,8 +325,15 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (chatInput.trim() && username) {
-      socketRef.current?.emit("send-message", { roomId, username, text: chatInput });
-      setMessages((prev) => [...prev, { username: "You", text: chatInput, socketId: socketRef.current?.id }]); // Optimistic update
+      socketRef.current?.emit("send-message", {
+        roomId,
+        username,
+        text: chatInput,
+      });
+      setMessages((prev) => [
+        ...prev,
+        { username: "You", text: chatInput, socketId: socketRef.current?.id },
+      ]); // Optimistic update
       setChatInput("");
     }
   };
@@ -360,13 +368,19 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
       {!username && (
         <div className="absolute inset-0 bg-gray-700 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-xl w-11/12 max-w-sm">
-            <h2 className="text-2xl font-bold mb-4 text-center">Enter Your Name</h2>
+            <h2 className="text-2xl font-bold mb-4 text-center">
+              Enter Your Name
+            </h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 const form = e.target as HTMLFormElement;
-                const input = form.elements.namedItem("username") as HTMLInputElement;
-                const finalUsername = input.value.trim() || `User-${Math.random().toString(16).slice(2, 6)}`;
+                const input = form.elements.namedItem(
+                  "username"
+                ) as HTMLInputElement;
+                const finalUsername =
+                  input.value.trim() ||
+                  `User-${Math.random().toString(16).slice(2, 6)}`;
                 setUsername(finalUsername);
                 sessionStorage.setItem("drawing-app-username", finalUsername);
               }}
@@ -378,20 +392,25 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
                 placeholder="Your name..."
                 autoFocus
               />
-              <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
+              <button
+                type="submit"
+                className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+              >
                 Join Room
               </button>
             </form>
           </div>
         </div>
-      )}
-      {" "}
+      )}{" "}
       <HeaderRaw />{" "}
       <div className="p-2 bg-gray-200 flex justify-between items-center shadow-sm">
         <p className="text-sm text-gray-700">
           You are in room: <strong className="font-semibold">{roomId}</strong>
         </p>
-        <button onClick={() => (window.location.href = "/")} className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600">
+        <button
+          onClick={() => (window.location.href = "/")}
+          className="bg-indigo-500 text-white px-3 py-1 rounded text-sm hover:bg-indigo-600"
+        >
           Go to Home
         </button>
       </div>
@@ -400,81 +419,85 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
         <div className="flex flex-col items-center p-4 space-y-4 lg:flex-grow w-full">
           {" "}
           {/* Toolbar */}
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setTool("pen")}
-            className={`px-4 py-2 rounded ${
-              tool === "pen" ? "bg-blue-500 text-white" : "bg-gray-300"
-            }`}
-          >
-            Pen{" "}
-          </button>
-          <button
-            onClick={() => setTool("eraser")}
-            className={`px-4 py-2 rounded ${
-              tool === "eraser" ? "bg-blue-500 text-white" : "bg-gray-300"
-            }`}
-          >
-            Eraser{" "}
-          </button>
-          <button
-            onClick={() => {
-              clearCanvas();
-              socketRef.current?.emit("clear-room", roomId);
-            }}
-            className="px-4 py-2 bg-red-500 text-white rounded"
-          >
-            Clear Board{" "}
-          </button>{" "}
-        </div>
-        <div className="flex space-x-3 items-center">
-          <input
-            type="color"
-            disabled={tool === "eraser"}
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            placeholder="eraser"
-          />
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={size}
-            onChange={(e) => setSize(Number(e.target.value))}
-            placeholder="size"
-          />
-        </div>
-        {/* Canvas Container */}
-        <div className="relative w-full max-w-[800px] max-h-[600px] aspect-4/3">
-          {renderCursors()}
-          <canvas
-            ref={canvasRef}
-            className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-action-none"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          />
-        </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setTool("pen")}
+              className={`px-4 py-2 rounded ${
+                tool === "pen" ? "bg-blue-500 text-white" : "bg-gray-300"
+              }`}
+            >
+              Pen{" "}
+            </button>
+            <button
+              onClick={() => setTool("eraser")}
+              className={`px-4 py-2 rounded ${
+                tool === "eraser" ? "bg-blue-500 text-white" : "bg-gray-300"
+              }`}
+            >
+              Eraser{" "}
+            </button>
+            <button
+              onClick={() => {
+                clearCanvas();
+                socketRef.current?.emit("clear-room", roomId);
+              }}
+              className="px-4 py-2 bg-red-500 text-white rounded"
+            >
+              Clear Board{" "}
+            </button>{" "}
+          </div>
+          <div className="flex space-x-3 items-center">
+            <input
+              type="color"
+              disabled={tool === "eraser"}
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="eraser"
+            />
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              placeholder="size"
+            />
+          </div>
+          {/* Canvas Container */}
+          <div className="relative w-full max-w-[800px] max-h-[600px] aspect-4/3">
+            {renderCursors()}
+            <canvas
+              ref={canvasRef}
+              className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-action-none"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            />
+          </div>
         </div>
 
         {/* Side Panel */}
         <div className="w-full lg:w-96 lg:flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l p-4 flex flex-col space-y-4 flex-grow min-h-0">
           {/* Who's Online */}
           <div className="flex-shrink-0">
-            <h3 className="font-bold text-lg mb-2">Who's Online ({activeUsers.length})</h3>
+            <h3 className="font-bold text-lg mb-2">
+              Who's Online ({activeUsers.length})
+            </h3>
             <ul className="list-disc list-inside max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
               {activeUsers.map((user, index) => (
-                <li key={index} className="truncate" title={user}>{user}</li>
+                <li key={index} className="truncate" title={user}>
+                  {user}
+                </li>
               ))}
             </ul>
           </div>
 
           {/* Chat */}
-          <div className="flex-grow flex flex-col border-t pt-4 min-h-0">
+          <div className="flex-grow flex flex-col border-t pt-4 min-h-56">
             <h3 className="font-bold text-lg mb-2">Chat</h3>
             <div className="h-56 bg-gray-50 p-2 rounded border overflow-y-auto mb-2">
               {messages.map((msg, index) => (
@@ -492,7 +515,12 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
                 className="grow border rounded-l p-2 min-w-0 mr-2"
                 placeholder="Say something..."
               />
-              <button type="submit" className="bg-blue-500 text-white px-4 rounded-r flex-shrink-0">Send</button>
+              <button
+                type="submit"
+                className="bg-blue-500 text-white px-4 rounded-r flex-shrink-0"
+              >
+                Send
+              </button>
             </form>
           </div>
         </div>
