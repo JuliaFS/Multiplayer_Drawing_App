@@ -498,7 +498,8 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             {renderCursors()}
             <canvas
               ref={canvasRef}
-              className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-action-pinch-zoom"
+              className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-none"
+              style={{ touchAction: "none" }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
