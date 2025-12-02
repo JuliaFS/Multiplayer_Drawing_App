@@ -125,25 +125,23 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   }, [redrawBoard]);
 
   useEffect(() => {
-  const reliableResize = () => {
-    canvasRef.current!.width = 0;
-    canvasRef.current!.height = 0;
+    const reliableResize = () => {
+      canvasRef.current!.width = 0;
+      canvasRef.current!.height = 0;
 
-    setTimeout(() => {
-      resizeCanvas();   // redraw after new size
-    }, 250);
-  };
+      setTimeout(() => {
+        resizeCanvas(); // redraw after new size
+      }, 250);
+    };
 
-  window.addEventListener("orientationchange", reliableResize);
-  window.addEventListener("resize", reliableResize);
+    window.addEventListener("orientationchange", reliableResize);
+    window.addEventListener("resize", reliableResize);
 
-  return () => {
-    window.removeEventListener("orientationchange", reliableResize);
-    window.removeEventListener("resize", reliableResize);
-  };
-}, [resizeCanvas]);
-
-
+    return () => {
+      window.removeEventListener("orientationchange", reliableResize);
+      window.removeEventListener("resize", reliableResize);
+    };
+  }, [resizeCanvas]);
 
   useEffect(() => {
     if (!username) return; // Don't connect until username is set
@@ -233,7 +231,8 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = (e) => {
+    disableScroll();
     setIsDrawing(true);
     setPrevPos(getMousePos(e));
   };
@@ -280,6 +279,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   };
 
   const handleMouseUp = () => {
+    enableScroll();
     setIsDrawing(false);
     setPrevPos(null);
   };
@@ -290,7 +290,8 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
   };
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+  const handleTouchStart = (e) => {
+    disableScroll();
     const touch = getTouchPos(e.nativeEvent);
     setIsDrawing(true);
     setPrevPos(touch);
@@ -338,9 +339,17 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
   };
 
   const handleTouchEnd = () => {
-    // No need for e.preventDefault() here, but good to be consistent
+    enableScroll();
     setIsDrawing(false);
     setPrevPos(null);
+  };
+
+  const disableScroll = () => {
+    document.body.style.overflow = "hidden";
+  };
+
+  const enableScroll = () => {
+    document.body.style.overflow = "auto";
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -489,7 +498,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
             {renderCursors()}
             <canvas
               ref={canvasRef}
-              className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-action-none"
+              className="border border-gray-400 bg-white rounded-md shadow-lg w-full h-full touch-action-pinch-zoom"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
