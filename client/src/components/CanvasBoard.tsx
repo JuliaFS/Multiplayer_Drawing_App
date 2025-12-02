@@ -231,7 +231,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     disableScroll();
     setIsDrawing(true);
     setPrevPos(getMousePos(e));
