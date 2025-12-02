@@ -290,7 +290,7 @@ export default function CanvasBoard({ roomId }: { roomId: string }) {
     return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
   };
 
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     disableScroll();
     const touch = getTouchPos(e.nativeEvent);
     setIsDrawing(true);
